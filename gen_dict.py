@@ -152,10 +152,6 @@ class FrequencyLoader:
                 return self.min_weight + int(weight_range * relative_freq)
                 
         return self.min_weight
-    
-    def get_word_weight(self, word: str, base_weight: int = 500) -> int:
-        """Return the base weight for words."""
-        return base_weight
             
     def adjust_weight(self, entry_text: str, pronun: str = "", base_weight: int = 0) -> int:
         """Adjust weight based on entry type and frequency."""
@@ -163,6 +159,24 @@ class FrequencyLoader:
 
 class TextProcessor:
     """Utilities for processing and converting text between formats."""
+    
+    @staticmethod
+    def is_valid_romanization(roman: str) -> bool:
+        """Check if romanization contains only valid characters."""
+        # Remove tone numbers and neutral tone markers first
+        clean_roman = re.sub(r'[0-9]', '', roman.lower())
+        clean_roman = clean_roman.replace('--', '')
+        
+        # Remove diacritical marks by normalizing
+        import unicodedata
+        normalized = unicodedata.normalize('NFD', clean_roman)
+        base_chars = ''.join([c for c in normalized if not unicodedata.combining(c)])
+        
+        # Valid base characters for Taiwanese romanization (plus o͘ -> oo)
+        base_chars = base_chars.replace('o͘', 'oo').replace('O͘', 'oo')
+        valid_chars = set('abceghijklmnoprstu -')
+        
+        return all(char in valid_chars for char in base_chars)
     
     @staticmethod
     def split_romanizations(roman_str: str) -> List[str]:
@@ -175,99 +189,90 @@ class TextProcessor:
         for part in roman_str.split('/'):
             for subpart in part.split(','):
                 cleaned = subpart.strip()
-                if cleaned:
+                if cleaned and TextProcessor.is_valid_romanization(cleaned):
                     romanizations.append(cleaned)
         return romanizations
     
     @staticmethod
+    def _detect_tone(syllable_lower: str, is_neutral: bool = False) -> str:
+        """Detect tone number from syllable with diacritical marks."""
+        if is_neutral:
+            return "4"
+        
+        tone_markers = {
+            "5": ('âêîôû', b'\xcc\x82'.decode()),
+            "2": ('áéíóúḿń', b'\xcc\x81'.decode()),
+            "3": ('àèìòùǹ', b'\xcc\x80'.decode()),
+            "7": ('āēīōū', b'\xcc\x84'.decode()),
+            "6": ('ăĕĭŏŭ', b'\xcc\x86'.decode()),
+            "9": ('űő', b'\xcc\x8b'.decode())
+        }
+        
+        # Check stop consonants first
+        if syllable_lower.endswith(('p', 't', 'k', 'h')):
+            return "8" if b'\xcc\x8d'.decode() in syllable_lower else "4"
+        
+        # Check tone markers
+        for tone, (chars, combining) in tone_markers.items():
+            if any(c in syllable_lower for c in chars) or combining in syllable_lower:
+                return tone
+        
+        return "1"  # Default tone
+    
+    @staticmethod
+    def _process_hyphenated_syllable(syllable: str) -> List[str]:
+        """Process hyphenated syllable and return list of syllables with tones."""
+        parts = syllable.split('-')
+        results = []
+        
+        for part in parts:
+            if not part:
+                continue
+            
+            part_lower = part.lower()
+            tone = TextProcessor._detect_tone(part_lower)
+            
+            normalized = unicodedata.normalize('NFD', part)
+            base_part = ''.join([c for c in normalized if not unicodedata.combining(c)])
+            results.append(base_part + tone)
+        
+        return results
+    
+    @staticmethod
+    def _normalize_syllable(syllable: str) -> str:
+        """Normalize syllable by removing diacritical marks."""
+        syllable = syllable.replace('o͘', 'oo').replace('O͘', 'OO')
+        normalized = unicodedata.normalize('NFD', syllable)
+        return ''.join([c for c in normalized if not unicodedata.combining(c)])
+    
+    @staticmethod
     def convert_tones(text: str) -> Tuple[str, bool]:
         """Convert Tâi-lô romanization with tone marks to numerical tone representation."""
-        # Note: This method processes a single romanization, not multiple alternatives
-        # Use split_romanizations() first to get individual romanizations
-        
         is_word = ' ' in text or '-' in text
-        has_neutral_tone = '--' in text
         
         # Handle neutral tone markers
         text = text.replace(' -- ', ' --').replace('-- ', '--').replace('--', ' -- ')
         text = re.sub(r'\s+', ' ', text).strip()
         
-        # Process each syllable
         syllables = text.split()
         result_syllables = []
         
         for i, syllable in enumerate(syllables):
             if not syllable.strip() or syllable == '--':
                 continue
-                
-            # Check for neutral tone
-            is_neutral = i > 0 and syllables[i-1] == '--'
-            tone = "4" if is_neutral else "1"  # Default tone
             
-            # Handle special o͘ sequence
-            syllable = syllable.replace('o͘', 'oo').replace('O͘', 'OO')
+            is_neutral = i > 0 and syllables[i-1] == '--'
             
             # Handle hyphenated syllables
             if '-' in syllable and not syllable.startswith('-') and not syllable.endswith('-'):
-                parts = syllable.split('-')
-                hyphen_results = []
-                
-                for part in parts:
-                    if not part:
-                        continue
-                    normalized = unicodedata.normalize('NFD', part)
-                    base_part = ''.join([c for c in normalized if not unicodedata.combining(c)])
-                    
-                    # Determine tone for this part
-                    part_tone = "1"  # Default tone
-                    part_lower = part.lower()
-                    
-                    if any(c in part_lower for c in 'âêîôû') or b'\xcc\x82'.decode() in part_lower:
-                        part_tone = "5"
-                    elif any(c in part_lower for c in 'áéíóúḿń') or b'\xcc\x81'.decode() in part_lower:
-                        part_tone = "2"
-                    elif any(c in part_lower for c in 'àèìòùǹ') or b'\xcc\x80'.decode() in part_lower:
-                        part_tone = "3"
-                    elif any(c in part_lower for c in 'āēīōū') or b'\xcc\x84'.decode() in part_lower:
-                        part_tone = "7"
-                    elif any(c in part_lower for c in 'ăĕĭŏŭ') or b'\xcc\x86'.decode() in part_lower:
-                        part_tone = "6"
-                    elif any(c in part_lower for c in 'űő') or b'\xcc\x8b'.decode() in part_lower:
-                        part_tone = "9"
-
-                    # Handle stop consonants
-                    if part_lower.endswith(('p', 't', 'k', 'h')):
-                        part_tone = "8" if b'\xcc\x8d'.decode() in part_lower else "4"
-                        
-                    hyphen_results.append(base_part + part_tone)
-                
-                if hyphen_results:
-                    result_syllables.extend(hyphen_results)
+                hyphen_results = TextProcessor._process_hyphenated_syllable(syllable)
+                result_syllables.extend(hyphen_results)
                 continue
             
-            # Process non-hyphenated syllables
+            # Process regular syllables
             syllable_lower = syllable.lower()
-            
-            if not is_neutral:
-                # Detect tone by examining the characters
-                if syllable_lower.endswith(('p', 't', 'k', 'h')):
-                    tone = "8" if b'\xcc\x8d'.decode() in syllable_lower else "4"
-                elif any(c in syllable_lower for c in 'âêîôû') or b'\xcc\x82'.decode() in syllable_lower:
-                    tone = "5"
-                elif any(c in syllable_lower for c in 'áéíóúḿń') or b'\xcc\x81'.decode() in syllable_lower:
-                    tone = "2"
-                elif any(c in syllable_lower for c in 'àèìòùǹ') or b'\xcc\x80'.decode() in syllable_lower:
-                    tone = "3"
-                elif any(c in syllable_lower for c in 'āēīōū') or b'\xcc\x84'.decode() in syllable_lower:
-                    tone = "7"
-                elif any(c in syllable_lower for c in 'ăĕĭŏŭ') or b'\xcc\x86'.decode() in syllable_lower:
-                    tone = "6"
-                elif any(c in syllable_lower for c in 'űő') or b'\xcc\x8b'.decode() in syllable_lower:
-                    tone = "9"
-            
-            # Get base form without diacritical marks
-            normalized = unicodedata.normalize('NFD', syllable)
-            base_syllable = ''.join([c for c in normalized if not unicodedata.combining(c)])
+            tone = TextProcessor._detect_tone(syllable_lower, is_neutral)
+            base_syllable = TextProcessor._normalize_syllable(syllable)
             
             if base_syllable.strip():
                 result_syllables.append(base_syllable + tone)
@@ -377,18 +382,18 @@ class DataLoader:
         if not self.data:
             self.load_data()
             
-        sheet_names = {
-            "Character sheet": self.config.char_sheet,
-            "Word sheet": self.config.word_sheet,
-            "Example sheet": self.config.example_sheet,
-            "Alternative pronunciations sheet": self.config.alt_pronun_sheet,
-            "Colloquial pronunciations sheet": self.config.colloq_pronun_sheet,
-            "Contracted pronunciations sheet": self.config.contract_pronun_sheet,
-            "Dialect variations sheet": self.config.dialect_sheet,
-            "Vocabulary comparisons sheet": self.config.vocab_comp_sheet
-        }
+        sheet_info = [
+            ("Character sheet", self.config.char_sheet),
+            ("Word sheet", self.config.word_sheet),
+            ("Example sheet", self.config.example_sheet),
+            ("Alternative pronunciations sheet", self.config.alt_pronun_sheet),
+            ("Colloquial pronunciations sheet", self.config.colloq_pronun_sheet),
+            ("Contracted pronunciations sheet", self.config.contract_pronun_sheet),
+            ("Dialect variations sheet", self.config.dialect_sheet),
+            ("Vocabulary comparisons sheet", self.config.vocab_comp_sheet)
+        ]
         
-        for desc, name in sheet_names.items():
+        for desc, name in sheet_info:
             print(f"{desc} - Total entries: {len(self.data.get(name, []))}")
 
 class DictionaryProcessor:
@@ -401,7 +406,6 @@ class DictionaryProcessor:
         self.freq_loader = freq_loader
         self.seen_entries = set()
         self.entry_id_map = {}  # Maps entry IDs to (hanzi, roman, weight) tuples
-        # Add new attributes for word frequency tracking
         self.collected_words = {}  # Maps (hanzi, roman) to source info
         self.example_word_pairs = []  # All word pairs from examples for frequency counting
 
@@ -474,16 +478,53 @@ class DictionaryProcessor:
 
     def get_weight(self, text: str, pronun: str = "", base_weight: int = 0, is_alt_pronun: bool = False, source_id: str = None) -> int:
         """Get weight for an entry, using frequency data if available."""
-        # For alternative pronunciations, use half the original weight
         if is_alt_pronun and source_id and source_id in self.entry_id_map:
             _, _, original_weight = self.entry_id_map[source_id]
             min_weight = self.freq_loader.min_weight if self.freq_loader else 0
             return max(original_weight // 2, min_weight)
                 
-        # Calculate weight based on frequency
         if self.freq_loader and self.config.use_freq_weighting:
             return self.freq_loader.adjust_weight(text, pronun, base_weight)
         return base_weight
+    
+    def _clean_entry(self, text: str) -> str:
+        """Clean entry text by removing brackets and content."""
+        return re.sub(r'【[^】]*】', '', text).strip()
+    
+    def _process_entry_pronunciations(self, hanzi: str, roman_str: str, base_weight: int, entry_id: str = None, is_alt_pronun: bool = False, source_id: str = None) -> List[str]:
+        """Process pronunciations for a single entry, handling both single chars and multi-char words."""
+        if not roman_str:
+            return []
+            
+        entries = []
+        romans = self.text_processor.split_romanizations(roman_str)
+        
+        for roman in romans:
+            roman = roman.strip()
+            if not roman or not self.text_processor.is_valid_romanization(roman):
+                continue
+                
+            rime_roman, _ = self.text_processor.convert_tones(roman)
+            
+            if len(hanzi) >= 2:
+                # Multi-character words: collect for frequency counting
+                word_key = (hanzi, rime_roman.lower())
+                if word_key not in self.collected_words:
+                    weight = self.get_weight(hanzi, rime_roman, base_weight, is_alt_pronun, source_id)
+                    self.collected_words[word_key] = (weight, entry_id or source_id)
+            else:
+                # Single characters: add directly
+                entry_key = f"{hanzi}:{rime_roman.lower()}"
+                if entry_key not in self.seen_entries:
+                    self.seen_entries.add(entry_key)
+                    weight = self.get_weight(hanzi, rime_roman, base_weight, is_alt_pronun, source_id)
+                    
+                    if entry_id:
+                        self.entry_id_map[entry_id] = (hanzi, rime_roman, weight)
+                    
+                    entries.append(f"{hanzi}\t{rime_roman}\t{weight}")
+        
+        return entries
     
     def process_word_entries(self) -> List[str]:
         """Process word entries from the word sheet."""
@@ -491,53 +532,21 @@ class DictionaryProcessor:
         word_entries = self.data_loader.get_sheet(self.config.word_sheet)
         
         for entry in word_entries:
-            if len(entry) < 3:  # Need at least ID and hanzi fields
+            if len(entry) < 3:
                 continue
                 
-            # Extract entry data
             entry_id = str(entry[0]) if entry[0] else ""
-            hanzi = str(entry[2])
-            roman_str = str(entry[3]) if len(entry) > 3 else ""
+            hanzi = self._clean_entry(str(entry[2]))
+            roman_str = self._clean_entry(str(entry[3])) if len(entry) > 3 else ""
             
-            # Skip invalid entries
             if not hanzi or any(s in hanzi for s in self.config.invalid_symbols):
                 continue
             
-            # Handle entries with romanization
             if roman_str:
-                # Split on both '/' and ',' separators to get all pronunciations
-                romans = self.text_processor.split_romanizations(roman_str)
-                
-                for roman in romans:
-                    roman = roman.strip()
-                    if not roman:
-                        continue
-                        
-                    # Convert to tone numbers
-                    rime_roman, _ = self.text_processor.convert_tones(roman)
-                    
-                    # For multi-character words (>= 2), collect for frequency counting
-                    if len(hanzi) >= 2:
-                        # Store the original weight and entry_id for frequency counting
-                        original_weight = self.get_weight(hanzi, rime_roman, self.config.word_weight)
-                        self.collected_words[(hanzi, rime_roman.lower())] = (original_weight, entry_id)
-                        continue
-                    
-                    # For single characters, add directly
-                    entry_key = f"{hanzi}:{rime_roman.lower()}"
-                    if entry_key in self.seen_entries:
-                        continue
-                        
-                    self.seen_entries.add(entry_key)
-                    weight = self.get_weight(hanzi, rime_roman, self.config.word_weight)
-                    
-                    # Store for alternative pronunciations
-                    if entry_id:
-                        self.entry_id_map[entry_id] = (hanzi, rime_roman, weight)
-                    
-                    word_dict_entries.append(f"{hanzi}\t{rime_roman}\t{weight}")
+                entries = self._process_entry_pronunciations(hanzi, roman_str, self.config.word_weight, entry_id)
+                word_dict_entries.extend(entries)
             else:
-                # For entries without romanization
+                # Entries without romanization
                 entry_prefix = f"{hanzi}:"
                 if not any(key.startswith(entry_prefix) for key in self.seen_entries):
                     self.seen_entries.add(entry_prefix)
@@ -556,15 +565,12 @@ class DictionaryProcessor:
             if len(entry) < 2:
                 continue
                 
-            # Get data
             hanzi = str(entry[0]).lstrip('-')
             roman_str = str(entry[1]).lstrip('-')
             
-            # Skip invalid entries
             if not hanzi or any(s in hanzi for s in self.config.invalid_symbols) or '--' in roman_str:
                 continue
             
-            # Handle entries without romanization
             if not roman_str:
                 entry_prefix = f"{hanzi}:"
                 if not any(key.startswith(entry_prefix) for key in self.seen_entries):
@@ -572,34 +578,19 @@ class DictionaryProcessor:
                     char_dict_entries.append(f"{hanzi}\t")
                 continue
             
-            # Process each romanization (handle both '/' and ',' separators)
-            romans = self.text_processor.split_romanizations(roman_str)
-            for roman in romans:
-                roman = roman.strip()
-                if not roman:
-                    continue
-                
-                rime_roman, _ = self.text_processor.convert_tones(roman)
-                entry_key = f"{hanzi}:{rime_roman.lower()}"
-                
-                if entry_key in self.seen_entries:
-                    continue
-                    
-                self.seen_entries.add(entry_key)
-                weight = self.get_weight(hanzi, roman, self.config.char_weight)
-                char_dict_entries.append(f"{hanzi}\t{rime_roman}\t{weight}")
+            entries = self._process_entry_pronunciations(hanzi, roman_str, self.config.char_weight)
+            char_dict_entries.extend(entries)
         
         print(f"Added {len(char_dict_entries)} character entries to dictionary")
         return char_dict_entries
 
     def process_pronunciation_sheet(self, sheet_name: str, weight: int, is_alt_pronun: bool = False) -> List[str]:
         """Process entries from pronunciation sheets."""
-        pronun_dict_entries = []
         entries = self.data_loader.get_sheet(sheet_name)
-        
         if not entries:
             return []
         
+        pronun_dict_entries = []
         for entry in entries:
             if len(entry) < 3:
                 continue
@@ -611,86 +602,55 @@ class DictionaryProcessor:
                 
                 if not hanzi or not roman_str or any(s in hanzi for s in self.config.invalid_symbols):
                     continue
-                    
-                # Handle both '/' and ',' separators
-                romans = self.text_processor.split_romanizations(roman_str)
-                for roman in romans:
-                    roman = roman.strip()
-                    if not roman:
-                        continue
-                    
-                    rime_roman, _ = self.text_processor.convert_tones(roman)
-                    
-                    # For multi-character words (>= 2), collect for frequency counting
-                    if len(hanzi) >= 2:
-                        word_key = (hanzi, rime_roman.lower())
-                        if word_key not in self.collected_words:
-                            adjusted_weight = self.get_weight(
-                                hanzi, rime_roman, weight, 
-                                is_alt_pronun=is_alt_pronun, source_id=source_id
-                            )
-                            self.collected_words[word_key] = (adjusted_weight, source_id)
-                        continue
-                    
-                    # For single characters, add directly
-                    entry_key = f"{hanzi}:{rime_roman.lower()}"
-                    if entry_key in self.seen_entries:
-                        continue
-                        
-                    self.seen_entries.add(entry_key)
-                    adjusted_weight = self.get_weight(
-                        hanzi, rime_roman, weight, 
-                        is_alt_pronun=is_alt_pronun, source_id=source_id
-                    )
-                    
-                    pronun_dict_entries.append(f"{hanzi}\t{rime_roman}\t{adjusted_weight}")
-            except (IndexError, ValueError, TypeError) as e:
+                
+                entries_processed = self._process_entry_pronunciations(
+                    hanzi, roman_str, weight, source_id, is_alt_pronun, source_id
+                )
+                pronun_dict_entries.extend(entries_processed)
+            except (IndexError, ValueError, TypeError):
                 continue
         
         return pronun_dict_entries
     
+    def _process_pronunciation_variant(self, sheet_name: str, weight: int, label: str) -> List[str]:
+        """Process pronunciation variant entries with standardized logging."""
+        entries = self.process_pronunciation_sheet(sheet_name, weight, is_alt_pronun=True)
+        print(f"Added {len(entries)} {label} entries")
+        return entries
+    
     def process_alternative_pronunciations(self) -> List[str]:
         """Process alternative pronunciation entries."""
-        entries = self.process_pronunciation_sheet(
+        return self._process_pronunciation_variant(
             self.config.alt_pronun_sheet, 
             self.config.alt_pronun_weight,
-            is_alt_pronun=True
+            "alternative pronunciation"
         )
-        print(f"Added {len(entries)} alternative pronunciation entries")
-        return entries
     
     def process_colloquial_pronunciations(self) -> List[str]:
         """Process colloquial pronunciation entries."""
-        entries = self.process_pronunciation_sheet(
+        return self._process_pronunciation_variant(
             self.config.colloq_pronun_sheet, 
             self.config.colloq_pronun_weight,
-            is_alt_pronun=True
+            "colloquial pronunciation"
         )
-        print(f"Added {len(entries)} colloquial pronunciation entries")
-        return entries
     
     def process_contracted_pronunciations(self) -> List[str]:
         """Process contracted pronunciation entries."""
-        entries = self.process_pronunciation_sheet(
+        return self._process_pronunciation_variant(
             self.config.contract_pronun_sheet, 
             self.config.contract_pronun_weight,
-            is_alt_pronun=True
+            "contracted pronunciation"
         )
-        print(f"Added {len(entries)} contracted pronunciation entries")
-        return entries
     
     def process_dialect_sheet(self) -> List[str]:
         """Process entries from the dialect sheet."""
-        dialect_dict_entries = []
         entries = self.data_loader.get_sheet(self.config.dialect_sheet, skip_header=False)
-        
         if not entries or len(entries) < 2:
             return []
             
-        # Extract dialect names from header
         dialect_names = [str(name) for name in entries[0][2:]] if len(entries[0]) > 2 else []
+        dialect_dict_entries = []
         
-        # Process entries (skip header)
         for i, entry in enumerate(entries):
             if i == 0 or len(entry) < 3:
                 continue
@@ -699,7 +659,6 @@ class DictionaryProcessor:
             if any(s in hanzi for s in self.config.invalid_symbols):
                 continue
                 
-            # Process each dialect pronunciation
             for j, dialect_roman in enumerate(entry[2:]):
                 if not dialect_roman:
                     continue
@@ -708,46 +667,22 @@ class DictionaryProcessor:
                 if not roman_str:
                     continue
                 
-                dialect_name = dialect_names[j] if j < len(dialect_names) else f"方言{j+1}"
-                
-                # Handle both '/' and ',' separators
-                romans = self.text_processor.split_romanizations(roman_str)
-                for roman in romans:
-                    roman = roman.strip()
-                    if not roman:
-                        continue
-                    
-                    rime_roman, _ = self.text_processor.convert_tones(roman)
-                    
-                    # For multi-character words (>= 2), collect for frequency counting
-                    if len(hanzi) >= 2:
-                        word_key = (hanzi, rime_roman.lower())
-                        if word_key not in self.collected_words:
-                            adjusted_weight = self.get_weight(hanzi, roman, self.config.dialect_weight)
-                            self.collected_words[word_key] = (adjusted_weight, None)
-                        continue
-                    
-                    # For single characters, add directly
-                    entry_key = f"{hanzi}:{rime_roman.lower()}"
-                    if entry_key in self.seen_entries:
-                        continue
-                
-                    self.seen_entries.add(entry_key)
-                    adjusted_weight = self.get_weight(hanzi, roman, self.config.dialect_weight)
-                    dialect_dict_entries.append(f"{hanzi}\t{rime_roman}\t{adjusted_weight}")
+                entries_processed = self._process_entry_pronunciations(
+                    hanzi, roman_str, self.config.dialect_weight
+                )
+                dialect_dict_entries.extend(entries_processed)
         
         print(f"Added {len(dialect_dict_entries)} single character dialect entries")
         return dialect_dict_entries
 
     def process_vocab_comparison_sheet(self) -> List[str]:
         """Process entries from the vocabulary comparison sheet."""
-        vocab_dict_entries = []
         entries = self.data_loader.get_sheet(self.config.vocab_comp_sheet)
-        
         if not entries:
             print("No data in vocabulary comparison sheet")
             return []
         
+        vocab_dict_entries = []
         for entry in entries:
             if len(entry) < 5:
                 continue
@@ -759,55 +694,91 @@ class DictionaryProcessor:
                 if not hanzi or not roman_str or any(s in hanzi for s in self.config.invalid_symbols):
                     continue
                 
-                # Handle both '/' and ',' separators
-                romans = self.text_processor.split_romanizations(roman_str)
-                for roman in romans:
-                    roman = roman.strip()
-                    if not roman:
-                        continue
-                    
-                    rime_roman, _ = self.text_processor.convert_tones(roman)
-                    
-                    # For multi-character words (>= 2), collect for frequency counting
-                    if len(hanzi) >= 2:
-                        word_key = (hanzi, rime_roman.lower())
-                        if word_key not in self.collected_words:
-                            adjusted_weight = self.get_weight(hanzi, roman, self.config.vocab_comp_weight)
-                            self.collected_words[word_key] = (adjusted_weight, None)
-                        continue
-                    
-                    # For single characters, add directly
-                    entry_key = f"{hanzi}:{rime_roman.lower()}"
-                    if entry_key in self.seen_entries:
-                        continue
-                        
-                    self.seen_entries.add(entry_key)
-                    adjusted_weight = self.get_weight(hanzi, roman, self.config.vocab_comp_weight)
-                    vocab_dict_entries.append(f"{hanzi}\t{rime_roman}\t{adjusted_weight}")
+                entries_processed = self._process_entry_pronunciations(
+                    hanzi, roman_str, self.config.vocab_comp_weight
+                )
+                vocab_dict_entries.extend(entries_processed)
             except (IndexError, ValueError, TypeError):
                 continue
         
         print(f"Added {len(vocab_dict_entries)} single character vocabulary comparison entries")
         return vocab_dict_entries
     
+    def _clean_text_pair(self, hanzi: str, roman: str) -> Tuple[str, str]:
+        """Clean hanzi and romanization text by removing invalid symbols."""
+        clean_hanzi = hanzi
+        clean_roman = roman
+        
+        for sym in self.config.invalid_symbols:
+            clean_hanzi = clean_hanzi.replace(sym, '')
+            clean_roman = clean_roman.replace(sym, ' ')
+        
+        clean_roman = re.sub(r'\s+', ' ', clean_roman).strip()
+        return clean_hanzi.strip(), clean_roman
+    
+    def _extract_word_segments(self, clean_hanzi: str, normalized_romaji: str) -> List[Tuple[str, str]]:
+        """Extract word segments from cleaned text."""
+        pos = 0
+        romaji_words = normalized_romaji.split()
+        extracted_pairs = []
+        prev_was_neutral_marker = False
+        
+        for word in romaji_words:
+            if word == '--':
+                prev_was_neutral_marker = True
+                continue
+            
+            clean_word = word
+            for p in self.config.invalid_symbols:
+                clean_word = clean_word.replace(p, '')
+            
+            if any(p in clean_word for p in self.config.invalid_symbols):
+                prev_was_neutral_marker = False
+                if pos < len(clean_hanzi):
+                    pos += 1
+                continue
+            
+            if prev_was_neutral_marker:
+                prev_was_neutral_marker = False
+                if '-' in clean_word and pos > 0 and pos < len(clean_hanzi):
+                    hanzi_segment = clean_hanzi[pos-1:pos]
+                    if len(hanzi_segment) == 1:
+                        extracted_pairs.append((hanzi_segment, f"{clean_word}--"))
+                continue
+            
+            if '-' in clean_word and not clean_word.startswith('--'):
+                word_syllables = clean_word.count('-') + 1
+                if 2 <= word_syllables <= 5 and pos + word_syllables <= len(clean_hanzi):
+                    hanzi_segment = clean_hanzi[pos:pos + word_syllables]
+                    if len(hanzi_segment) == word_syllables:
+                        extracted_pairs.append((hanzi_segment, clean_word))
+                    pos += word_syllables
+            elif clean_word.startswith('--'):
+                continue
+            elif '-' not in clean_word and pos < len(clean_hanzi):
+                hanzi_segment = clean_hanzi[pos:pos+1]
+                extracted_pairs.append((hanzi_segment, clean_word))
+                pos += 1
+        
+        return extracted_pairs
+    
     def extract_words_from_examples(self) -> List[Tuple[str, str]]:
         """Extract word-romanization pairs from example sentences."""
-        word_pairs = []
         example_entries = self.data_loader.get_sheet(self.config.example_sheet, skip_header=False)
         
         if not example_entries or len(example_entries) < 2:
             print("No example entries found, skipping extraction from examples")
             return []
         
+        word_pairs = []
+        example_count = 0
+        print(f"Processing {len(example_entries)} example entries...")
+        
         try:
-            example_count = 0
-            print(f"Processing {len(example_entries)} example entries...")
-            
             for i, entry in enumerate(example_entries):
                 if i == 0 or len(entry) < 5:
                     continue
                 
-                # Extract example text
                 hanzi = str(entry[3])
                 roman_str = str(entry[4])
                 
@@ -817,96 +788,28 @@ class DictionaryProcessor:
                 example_count += 1
                 roman = roman_str.strip()
                 
-                # For clean entries with direct alignment
+                # Handle clean entries
                 if not any(s in hanzi for s in self.config.invalid_symbols):
                     if len(hanzi) == self.text_processor.count_syllables(roman):
                         word_pairs.append((hanzi, roman))
                     continue
                 
-                # For entries with symbols
-                clean_hanzi = hanzi
-                clean_roman = roman
-                
-                for sym in self.config.invalid_symbols:
-                    clean_hanzi = clean_hanzi.replace(sym, '')
-                    clean_roman = clean_roman.replace(sym, ' ')
-
-                clean_roman = re.sub(r'\s+', ' ', clean_roman).strip()
-                clean_hanzi = clean_hanzi.strip()
-                
-                # Pre-process to handle neutral tone markers
+                # Handle entries with symbols
+                clean_hanzi, clean_roman = self._clean_text_pair(hanzi, roman)
                 normalized_romaji = clean_roman.replace('--', ' ')
                 normalized_romaji = re.sub(r'\s+', ' ', normalized_romaji).strip()
                 
-                # Skip if lengths don't match
                 total_syllables = self.text_processor.count_syllables(normalized_romaji)
                 if len(clean_hanzi) != total_syllables:
-                    print(f"Length mismatch: hanzi={len(clean_hanzi)}, syllables={total_syllables}")
-                    print(f"hanzi: {clean_hanzi}")
-                    print(f"roman: {normalized_romaji}")
                     continue
-                    
-                # Extract words
-                pos = 0
-                romaji_words = normalized_romaji.split()
-                extracted_pairs = []
-                prev_was_neutral_marker = False
                 
-                for word in romaji_words:
-                    if word == '--':
-                        prev_was_neutral_marker = True
-                        continue
-                        
-                    # Clean the word
-                    clean_word = word
-                    for p in self.config.invalid_symbols:
-                        clean_word = clean_word.replace(p, '')
-                
-                    # Skip invalid words
-                    if any(p in clean_word for p in self.config.invalid_symbols):
-                        prev_was_neutral_marker = False
-                        if pos < len(clean_hanzi):
-                            pos += 1
-                        continue
-                    
-                    # Handle neutral tone words
-                    if prev_was_neutral_marker:
-                        prev_was_neutral_marker = False
-                        if '-' in clean_word and pos > 0 and pos < len(clean_hanzi):
-                            hanzi_segment = clean_hanzi[pos-1:pos]
-                            if len(hanzi_segment) == 1:
-                                extracted_pairs.append((hanzi_segment, f"{clean_word}--"))
-                        continue
-                    
-                    # Handle hyphen-connected words
-                    if '-' in clean_word and not clean_word.startswith('--'):
-                        word_syllables = clean_word.count('-') + 1
-                        
-                        if 2 <= word_syllables <= 5 and pos + word_syllables <= len(clean_hanzi):
-                            hanzi_segment = clean_hanzi[pos:pos + word_syllables]
-                            
-                            if len(hanzi_segment) == word_syllables:
-                                extracted_pairs.append((hanzi_segment, clean_word))
-                            
-                            pos += word_syllables
-                    elif clean_word.startswith('--'):
-                        # Skip neutral tone words
-                        continue
-                    elif '-' not in clean_word and pos < len(clean_hanzi):
-                        # Single syllable words
-                        hanzi_segment = clean_hanzi[pos:pos+1]
-                        extracted_pairs.append((hanzi_segment, clean_word))
-                        pos += 1
-                
-                # Add extracted pairs
+                extracted_pairs = self._extract_word_segments(clean_hanzi, normalized_romaji)
                 word_pairs.extend(extracted_pairs)
             
             print(f"Processed {example_count} examples and found {len(word_pairs)} potential words")
             
         except Exception as e:
             print(f"Error processing examples: {str(e)}")
-            import traceback
-            traceback.print_exc()
         
         return word_pairs
         
@@ -914,32 +817,24 @@ class DictionaryProcessor:
         """Collect word pairs extracted from examples for frequency counting."""
         word_pairs = self.extract_words_from_examples()
         
-        # Collect all word-pronunciation pairs from examples for frequency counting
         for hanzi, roman_str in word_pairs:
-            if not roman_str or len(hanzi) < 2:  # Only collect multi-character words
+            if not roman_str or len(hanzi) < 2:
                 continue
                 
-            if hanzi and not self.text_processor.is_valid_word_entry(hanzi, roman_str, self.config.invalid_symbols):
+            if not self.text_processor.is_valid_word_entry(hanzi, roman_str, self.config.invalid_symbols):
                 continue
                 
-            # Handle multiple pronunciations
             romans = self.text_processor.split_romanizations(roman_str)
             for roman in romans:
                 roman = roman.strip()
-                if not roman:
+                if not roman or not hanzi:
                     continue
                     
                 rime_roman, _ = self.text_processor.convert_tones(roman)
-            
-                if not hanzi:
-                    continue
-                
-                # Add to collected words if not already present (don't overwrite existing entries)
                 word_key = (hanzi, rime_roman.lower())
+                
                 if word_key not in self.collected_words:
-                    original_weight = self.config.example_weight
-                    entry_id = None  # No direct entry ID for examples
-                    self.collected_words[word_key] = (original_weight, entry_id)
+                    self.collected_words[word_key] = (self.config.example_weight, None)
         
         print(f"Collected {len(self.collected_words)} total words for frequency analysis")
 
@@ -990,10 +885,10 @@ import_tables:
         print(f"\nSample from generated dictionary:")
         try:
             with open(self.config.output_file, "r", encoding="utf-8") as f:
-                # Skip header (approximately 15 lines)
+                # Skip header
                 for _ in range(15):
                     next(f, None)
-                # Print sample entries
+                
                 for _ in range(num_lines):
                     line = next(f, None)
                     if line:
@@ -1014,18 +909,15 @@ class DictionaryGenerator:
     def generate(self) -> str:
         """Generate the dictionary by processing all entry types."""
         try:
-            # Load data
+            # Load data and frequency data
             self.data_loader.load_data()
             self.data_loader.print_sheet_info()
             
-            # Load frequency data if specified
             if self.freq_loader and self.config.freq_file:
                 self.freq_loader.load_frequency_data()
             
             # Process all entry types
             entries = []
-            
-            # Process single character and direct entries first
             entries.extend(self.processor.process_word_entries())
             entries.extend(self.processor.process_alternative_pronunciations())
             entries.extend(self.processor.process_colloquial_pronunciations())
@@ -1033,24 +925,18 @@ class DictionaryGenerator:
             entries.extend(self.processor.process_dialect_sheet())
             entries.extend(self.processor.process_vocab_comparison_sheet())
             
-            # Collect words from examples for frequency counting
             self.processor.process_example_words()
             
-            # Process collected multi-character words with frequency filtering
             frequency_filtered_entries = self.processor.process_collected_words_with_frequency(
                 min_occurrences=self.config.min_occurrences
             )
             entries.extend(frequency_filtered_entries)
-            
-            # Add single character entries last
             entries.extend(self.processor.process_character_entries())
             
             print(f"Total dictionary entries: {len(entries)}")
             
-            # Write to file
             output_file = self.writer.write_dictionary(entries)
             self.writer.print_dictionary_sample()
-            
             return output_file
             
         except Exception as e:

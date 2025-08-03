@@ -11,6 +11,7 @@ function F.func( input, env )
   local to_poj = ctx:get_option("poj")
   for cand in input:iter() do
     if to_poj and cand.type ~= "completion" and cand.type ~= "table" then
+      cand.preedit = cand.preedit:gsub("ts", "ch")
       cand = cand:to_shadow_candidate(
         cand.type,
         F.poj_pj:apply(cand.text, true),
