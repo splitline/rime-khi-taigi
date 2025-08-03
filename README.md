@@ -1,6 +1,6 @@
 
 
-# 齒台語（Key Tâi-gí）輸入方案 
+# <ruby>齒<rp>(</rp><rt>khí</rt><rp>)</rp></ruby>台語（Key Tâi-gí）輸入方案 
 
 > 台羅（KIP）+ POJ、方音（TPS）、<del>彙音寶鑑</del>（無適合當做電腦頂兮輸入方案）
 
