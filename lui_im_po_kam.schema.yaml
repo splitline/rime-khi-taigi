@@ -1,0 +1,426 @@
+# Rime schema
+# encoding: utf-8
+#
+# 彙音寶鑑切韻輸入法
+#
+---
+
+schema:
+  schema_id: lui_im_po_kam
+  name: 彙音寶鑑
+  version: "1.0.1"
+  description: 基於彙音寶鑑的切韻輸入法，暗學仔嘛會得用
+
+switches:
+  - name: ascii_mode
+    states: ["台文", "英文"]
+    reset: 0
+  - name: zh_tw
+    reset: 1
+
+engine:
+  processors:
+    - ascii_composer
+    - recognizer
+    - speller
+    - punctuator
+    - selector
+    - navigator
+    - fluency_editor
+  segmentors:
+    - ascii_segmentor
+    - matcher
+    - abc_segmentor
+    - punct_segmentor
+    - fallback_segmentor
+  translators:
+    - punct_translator
+    - table_translator@custom_phrase
+    - script_translator
+  filters:
+    - uniquifier
+
+menu:
+  alternative_select_keys: "qwdfzxcv"
+  page_size: 20
+
+speller:
+  alphabet: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ123456789'\\*|!.`{=+&VIUMJNREYQCW^O$%# "
+  initials: "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ\\*|!.`{=+&VIUMJNREYQCW^O$%#"
+  # finals: "123456789"
+  # strict_spelling: true
+  use_space: true
+  delimiter: "'"
+  auto_select: false
+  algebra:
+    # 鼻音轉換：n... -> l..N
+    - xform/\bn([aeioOu]+)/l$1N/g
+    - xform/\bm([aeioOu]+)/b$1N/g
+    - xform/\bng([aeioOu]+)/g$1N/g
+
+    - xform/\btsh/X/g  # tsh -> 出
+    - xform/\bkh/K/g  # kh -> 去
+    - xform/\bth/T/g  # th -> 他
+    - xform/\bph/P/g  # ph -> 頗
+    - xform/\bts/x/g  # ts -> 曾
+
+    - xform/\bp(?!h)/B/g  # p -> 邊
+    - xform/\bk(?!h)/G/g  # k -> 求
+    - xform/\bt(?!h)/D/g  # t -> 地
+    - xform/\bh/H/g  # h -> 喜
+
+
+
+    # 第一步：轉換標準羅馬字為特殊韻母符號 (與preedit_format相同方向)
+    
+    # 鼻音
+    - xform/([aeiou])nn/$1N/g # vowelN to Vnn (鼻音)
+    
+
+    - xform/uak/\*\*/g      # uak -> 嚾
+    - xform/uang/\*/g      # uang -> 光
+    
+    - xform/iak/\|\|/g     # iak -> 殃
+    - xform/iang/\|/g     # iang -> 姜
+    
+    - xform/iok/\!\!/g     # iok -> 雍 
+    - xform/iong/\!/g     # iong -> 恭
+
+    - xform/uat/\.\./g    # uat -> 𡨚
+    - xform/uan/\./g      # uan -> 觀
+
+    - xform/iat/``/g      # iat -> 淵 (堅入)
+    - xform/ian/`/g       # ian -> 堅
+
+    - xform/iap/\{\{/g     # iap -> 掩 (兼入)
+    - xform/iam/\{/g      # iam -> 兼
+
+    # - xform/iauh/==/g     # iauh -> 貓 (嬌入)
+    - xform/iaunn/=N/g     # uaiN -> 嘄 (嬌鼻)
+    - xform/iau/=/g       # iau -> 嬌
+
+    - xform/uainn/\\N/g    # uaiN -> 糜 (乖鼻)
+    # - xform/uaih/\\\\/g    # uaih -> 歪 (乖入)
+    - xform/uai/\\/g      # uai -> 乖
+
+    - xform/ak/&&/g       # ak -> 翁 (江入)
+    - xform/ang/&/g       # ang -> 江
+
+    - xform/ok/VV/g       # ok -> 翁 (公入)
+    - xform/ong/V/g       # ong -> 公
+
+    - xform/ik/II/g       # ik -> 英 (經入)
+    - xform/ing/I/g       # ing -> 經
+
+    - xform/ut/UU/g       # ut -> 溫 (君入)
+    - xform/un/U/g        # un -> 君
+
+    - xform/at/AA/g       # at -> 安 (干入)
+    - xform/an/A/g        # an -> 干
+
+    - xform/ap/MM/g       # ap -> 庵 (甘入)
+    - xform/am/M/g        # am -> 甘
+
+    - xform/ip/JJ/g       # ip -> 音 (金入)
+    - xform/im/J/g        # im -> 金
+
+    - xform/it/ZZ/g       # it -> 因 (巾入)
+    - xform/in/Z/g        # in -> 巾
+
+    - xform/uinn/RN/g      # uiN -> 關 (規鼻)
+    # - xform/uih/RR/g      # uih -> 威 (規入)
+    - xform/ui/R/g        # ui -> 規
+
+    # - xform/ueh/EE/g      # ueh -> 碢 (檜入)
+    - xform/ue/E/g        # ue -> 檜
+
+    - xform/iann/YN/g      # iaN -> 驚 (迦鼻)
+    # - xform/iah/YY/g      # iah -> ㇀ (迦入)
+    - xform/ia/Y/g        # ia -> 迦
+
+    # - xform/iuh/QQ/g      # iuh -> 憂 (丩入)
+    - xform/iunn/QN/g      # iuN -> 薑 (丩鼻)
+    - xform/iu/Q/g        # iu -> 丩
+
+    # - xform/ioh/CC/g      # ioh -> 腰 (茄入)
+    - xform/io/C/g        # io -> 茄
+
+    # - xform/uah/WW/g      # uah -> 蛙 (瓜入)
+    - xform/uann/WN/g      # uaN -> 官 (瓜鼻)
+    - xform/ua/W/g        # ua -> 瓜
+
+    - xform/aunn/\^N/g     # auN -> 爻 (交鼻)
+    # - xform/auh/\^\^/g     # auh -> 敺 (交入)
+    - xform/au/\^/g       # au -> 交
+
+    # - xform/ooh/OO/g      # ooh -> 烏 (沽入)
+    - xform/oo/O/g        # oo -> 沽
+
+    # - xform/aih/\$\$/g     # aih -> 哀 (皆入)
+    - xform/ainn/\$N/g     # aiN -> 閒 (皆鼻)
+    - xform/ai/\$/g        # ai -> 皆
+
+    - xform/op/%%/g       # op -> 朁 (箴入)
+    - xform/om/%/g        # om -> 箴
+
+    # - xform/k/##/g        # ng -> 褌
+    - xform/ng/#/g        # ng -> 褌
+
+    # mng=bng, nng=lng
+    - xform/m#/b#/g
+    - xform/n#/l#/g
+
+    # 入聲
+    - xform/([aeiouCOEQWYR\\$^=])(N?)h/$1$1$2/g  # double vowel to Vh (入聲)
+    # - xform/([aeiouO])Nh/$1$1/g
+
+    # 共順序換做彙音標示法
+    - xform/\b([XKTPxlBGDjsHbg])?([^N]+)(N?)(\d)/$2$4$1$3/g
+    - derive/([aeiou\*\|\!\.`\{=\\&VIUAMJZREYQCW\^O\$%])(\d?)([XKTPxlBGDjsHbg])?N/$1N$2$3/g
+
+    - derive/(.){2}([48])/$1$2/g
+
+    # 第四步：簡拼
+    - derive/1/ /
+    # 允許無聲調輸入
+    - derive/[1-9]//
+    # 簡拼聲母
+    - abbrev/.+\d([XKTPxlBGDjsHbg])N?$/$1/  # 允許無聲調輸入
+    
+
+translator:
+  dictionary: hanlo
+  prism: lui_im_po_kam
+  enable_correction: false
+  enable_sentence: false
+  initial_quality: 0
+  spelling_hints: 4
+  always_show_comments: true
+  preedit_format:
+    - xform/^/【/
+    - xform/$/】/
+    - xform/'/·/g
+
+    - xform/([aeiou\*\|\!\.`\{=\\&VIUAMJZREYQCW\^O\$%])(\d?)([XKTPxlBGDjsHbg])?N/$1N$2$3/g
+    
+    # 第二步：轉換聲母 (按長度排序，避免衝突)
+    - xform/X/出/g # tsh
+    - xform/K/去/g # kh
+    - xform/T/他/g # th
+    - xform/P/頗/g # ph
+    - xform/x/曾/g # ts
+    - xform/l/柳/g
+    - xform/B/邊/g # p
+    - xform/G/求/g # k
+    - xform/D/地/g # t
+    - xform/j/入/g
+    - xform/s/時/g
+    - xform/H/喜/g # h
+    - xform/b/門/g
+    - xform/g/語/g
+
+    - xform/([aeiou\*\|\!\.`\{=\\&VIUAMJZREYQCW\^O\$%]){1,2}([48])/$1$1$2/g  # 重複元音來表示入聲韻母
+
+    # 第三步：轉換韻母 (以單一ASCII字符/符號表示)
+    - xform/\*\*/嚾/g     # uak (嚾入)
+    - xform/\*/光/g      # uang
+    
+    - xform/\|\|/殃/g     # iap (殃入)
+    - xform/\|/姜/g     # iang
+    
+    - xform/\!\!/雍/g     # iok (恭入)
+    - xform/\!/恭/g     # iong
+
+    - xform/\.\./𡨚/g   # uat
+    - xform/\./觀/g     # uan
+    
+    - xform/``/淵/g     # iat (堅入)
+    - xform/`N/驚/g    # iann (堅鼻)
+    - xform/`/堅/g      # ian
+    
+    - xform/\{\{/掩/g    # iap (兼入)
+    - xform/\{/兼/g     # iam
+    
+    - xform/==/貓/g     # iauh (嬌入)
+    - xform/=N/嘄/g     # iaunn (嬌鼻)
+    - xform/=/嬌/g      # iau
+
+    # - xform/\\\\N/𠃛/g   # uainnh
+    - xform/\\\\/歪/g    # uaih (乖入)
+    - xform/\\N/糜/g    # uainn (乖鼻)
+    - xform/\\/乖/g     # uai
+    
+    - xform/&&/翁/g     # ak (江入)
+    - xform/&/江/g      # ang
+    
+    - xform/VV/翁/g     # ok (公入)
+    - xform/V/公/g      # ong
+
+    - xform/II/英/g     # ik (經入)
+    - xform/I/經/g      # ing/eng
+    
+    - xform/UU/溫/g     # ut (君入)
+    - xform/U/君/g      # un
+    
+    - xform/AA/安/g     # at (干入)
+    - xform/A/干/g      # an
+    
+    - xform/MM/庵/g     # ap (甘入)
+    - xform/M/甘/g      # am
+    
+    - xform/JJ/音/g     # ip (金入)
+    - xform/J/金/g      # im
+    
+    - xform/ZZ/因/g     # it (巾入)
+    - xform/Z/巾/g      # in
+    
+    - xform/RR/威/g     # uih (規入)
+    - xform/RN/關/g     # uinn (規鼻)
+    - xform/R/規/g      # ui
+    
+    - xform/EE/碢/g     # ueh (檜入)
+    - xform/E/檜/g      # ue
+    
+    - xform/YY/╯/g     # iah (迦入)
+    - xform/YN/驚/g     # iann (迦鼻)
+    - xform/Y/迦/g      # ia
+    
+    - xform/QQ/憂/g     # iuh (丩入)
+    - xform/QN/薑/g     # iunn (丩鼻)
+    - xform/Q/丩/g      # iu
+    
+    - xform/CC/腰/g     # ioh (茄入)
+    - xform/C/茄/g      # io
+    
+    - xform/WWN/鞍/g     # uannh (瓜入)
+    - xform/WW/蛙/g     # uah (瓜入)
+    - xform/WN/官/g     # uann (瓜鼻)
+    - xform/W/瓜/g      # ua
+    
+    - xform/\^\^/敺/g     # auh (交入)
+    - xform/\^N/爻/g     # aunn (交鼻)
+    - xform/\^/交/g     # au
+    
+    - xform/OO/烏/g     # ooh (沽入)
+    - xform/O/沽/g      # oo
+    
+    - xform/\$\$N/喚/g    # ainnh
+    - xform/\$\$/哀/g    # aih (皆入)
+    - xform/\$N/閒/g    # ainn (皆鼻)
+    - xform/\$/皆/g     # ai
+    
+    - xform/%%/朁/g     # op (箴入)
+    - xform/%/箴/g      # om
+    
+    # - xform/##/秧/g     # k
+    - xform/#/褌/g      # ng
+    
+    # - xform/\bmm/呣/g   # p (鼻音)
+    - xform/m/姆/g
+
+    - xform/aaN/嚂/g    # annh
+    - xform/aa/亞/g    # ah (膠入)
+    - xform/aN/監/g    # ann (膠鼻)
+    - xform/a/膠/g
+    
+    - xform/eeN/嬰/g    # ennh
+    - xform/ee/挨/g    # eh (嘉入)
+    - xform/eN/更/g    # enn (嘉鼻)
+    - xform/e/嘉/g
+    
+    # - xform/iiN/𠁣/g    # innh
+    - xform/ii/衣/g    # ih (居入)
+    - xform/iN/梔/g    # inn (居鼻)
+    - xform/i/居/g
+    
+    - xform/ooN/嗡/g    # onnh
+    - xform/oo/萵/g    # oh (高入)
+    - xform/oN/姑/g    # onn (高鼻)
+    - xform/o/高/g
+    
+    - xform/uu/污/g
+    - xform/u/龜/g
+    
+    # 第四步：處理零聲母（元音開頭的音節）
+    - xform/(嚾|光|殃|姜|雍|恭|𡨚|觀|淵|驚|堅|掩|兼|貓|嘄|嬌|歪|糜|乖|翁|江|翁|公|英|經|溫|君|安|干|庵|甘|音|金|因|巾|威|關|規|碢|檜|㇀|驚|迦|憂|薑|丩|腰|茄|蛙|官|瓜|敺|爻|交|烏|沽|哀|閒|皆|朁|箴|秧|褌|呣|姆|亞|監|膠|挨|更|嘉|衣|梔|居|萵|姑|高|污|龜)([1-9]?)(·?)/\1\2英\3/g
+    
+    # 第五步：聲調轉換
+    - xform/ /一/g
+    - xform/1/一/g
+    - xform/2/二/g
+    - xform/3/三/g
+    - xform/4/四/g
+    - xform/5/五/g
+    - xform/6/六/g
+    - xform/7/七/g
+    - xform/8/八/g
+    - xform/9/九/g
+
+    - xform/N/ⁿ/g
+
+
+  comment_format:
+    - xform/'/-/g
+    - xform ([AaEeIiOoUu])(r?)(n[ng]?|m)?([ptkh])?(\d) $1$5$2$3$4
+    - xform ([MmNn])(g)?(h)?(\d) $1$4$2$3
+    - xform ([AaOo])([iuo])(\d) $1$3$2
+    - xform (.)[14] $1
+    - xform a7 ā
+    - xform a2 á
+    - xform a8 a̍
+    - xform a3 à
+    - xform a5 â
+    - xform a9 a̋
+    - xform a6 ǎ
+    - xform e7 ē
+    - xform e2 é
+    - xform e8 e̍
+    - xform e3 è
+    - xform e5 ê
+    - xform e9 e̋
+    - xform e6 ě
+    - xform i7 ī
+    - xform i2 í
+    - xform i8 i̍
+    - xform i3 ì
+    - xform i5 î
+    - xform i9 i̋
+    - xform i6 ǐ
+    - xform o7 ō
+    - xform o2 ó
+    - xform o8 o̍
+    - xform o3 ò
+    - xform o5 ô
+    - xform o9 ő
+    - xform o6 ǒ
+    - xform u7 ū
+    - xform u2 ú
+    - xform u8 u̍
+    - xform u3 ù
+    - xform u5 û
+    - xform u9 ű
+    - xform u6 ǔ
+    - xform m7 m̄
+    - xform m2 ḿ
+    - xform m8 m̍
+    - xform m3 m̀
+    - xform m5 m̂
+    - xform m9 m̋
+    - xform m6 m̌
+    - xform n7 n̄
+    - xform n2 ń
+    - xform n8 n̍
+    - xform n3 ǹ
+    - xform n5 n̂
+    - xform n9 n̋
+    - xform n6 ň
+
+custom_phrase:
+  dictionary: ""
+  user_dict: lui_im_po_kam.custom_phrase
+  db_class: tabledb
+  enable_completion: false
+  enable_sentence: false
+  initial_quality: 0
+
+

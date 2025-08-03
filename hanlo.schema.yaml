@@ -1,0 +1,285 @@
+# Rime schema
+# encoding: utf-8
+ 
+
+---
+
+schema:  # 輸入法方案
+  schema_id: hanlo  # 輸入法ID
+  name: 漢羅  # 輸入法名稱
+  version: "1.2.0"  # 版本號碼
+  description: 台羅輸入法
+  author:
+    - splitline
+  dependencies:
+    - melt_eng
+
+# [kh][ng]ert[oo]uiop
+# as[th][ph]ghjkl
+# [ts][tsh]c[nn]bnm
+
+
+switches:
+  - name: ascii_mode
+    reset: 0
+  - name: emoji
+    states: [ 😴, 😄 ]
+    reset: 1
+  - name: lomaji
+    states: ['漢', 'Lô']
+    reset: 0
+  - name: poj
+    states: ['TL', 'POJ']
+
+
+engine:
+  processors:
+    - ascii_composer
+    - recognizer
+    - key_binder
+    - speller
+    - punctuator
+    - selector
+    - navigator
+    - express_editor
+
+  segmentors:
+    - ascii_segmentor
+    - matcher
+    - abc_segmentor
+    - punct_segmentor
+    - fallback_segmentor
+
+  translators:
+    - punct_translator
+    - table_translator@custom_phrase  # 自訂語句
+    - table_translator@melt_eng
+    - script_translator
+
+  filters:
+    - lua_filter@*poj
+    - lua_filter@*reorder
+    - simplifier@emoji
+    - lua_filter@*emoji
+    - uniquifier
+    - lua_filter@*lomaji
+
+
+long_word_filter:
+  count: 3
+  idx: 5
+
+
+emoji:
+  option_name: emoji
+  opencc_config: emoji.json
+  inherit_comment: false
+
+
+ascii_composer:
+  switch_key:
+    Shift_L: commit_text
+    Shift_R: noop
+    Caps_Lock: commit_text
+    Control_L: noop
+    Control_R: noop
+
+menu:
+  alternative_select_keys: "QWERASDZXC"
+  page_size: 10
+
+
+speller:
+  alphabet: 'abcdefghijklmnopqrstuvwxyz1234567890 '
+  initials: 'abcdefghijklmnopqrstuvwxyz'
+  # finals: "123456789qwzx "
+  use_space: true
+  auto_select: false
+  delimiter: " "
+  algebra:
+    # 會當用 POJ 來拍
+    - derive/^ts/ch/
+    - derive/ua/oa/
+    - derive/ue/oe/
+    - derive/ik/ek/
+    - derive/ing/eng/
+
+    # 特殊拼法
+
+    - derive/^tsh/x/
+    - derive/^ts/z/
+    - derive/^kh/q/
+    - derive/^th/d/
+    - derive/^ph/f/
+    - derive/oo/y/
+    - derive/ng/w/
+    - derive/nn(h?\d)$/v$1/
+
+    # # 音變
+    # - derive/ia/e/
+    # - derive/ia/ie/
+
+
+    # 無聲調輸入
+    # - derive/h([48])$/$1/
+    - derive/[1-9]$//
+
+    # 簡拼
+    - abbrev/^([ptkhbgjmnlsxzqdf])(?![hs]).+/$1/
+    - abbrev/^([ptk]h).+/$1/
+    - abbrev/^(ts)(?!h).+/$1/
+    - abbrev/^(tsh).+/$1/
+
+
+translator:
+  dictionary: hanlo
+  initial_quality: 0
+  spelling_hints: 5
+  initial_quality: 1.2
+  always_show_comments: true
+  comment_format:
+    - xform/ /-/
+    - xform ([aeiou])(r?)(n[ng]?|m)?([ptkh])?(\d) $1$5$2$3$4
+    - xform ([mn])(g)?(h)?(\d) $1$4$2$3
+    - xform ([ao])([iuo])(\d) $1$3$2
+    - xform (.)[14] $1
+    - xform a7 ā
+    - xform a2 á
+    - xform a8 a̍
+    - xform a3 à
+    - xform a5 â
+    - xform a9 a̋
+    - xform a6 ǎ
+    - xform e7 ē
+    - xform e2 é
+    - xform e8 e̍
+    - xform e3 è
+    - xform e5 ê
+    - xform e9 e̋
+    - xform e6 ě
+    - xform i7 ī
+    - xform i2 í
+    - xform i8 i̍
+    - xform i3 ì
+    - xform i5 î
+    - xform i9 i̋
+    - xform i6 ǐ
+    - xform o7 ō
+    - xform o2 ó
+    - xform o8 o̍
+    - xform o3 ò
+    - xform o5 ô
+    - xform o9 ő
+    - xform o6 ǒ
+    - xform u7 ū
+    - xform u2 ú
+    - xform u8 u̍
+    - xform u3 ù
+    - xform u5 û
+    - xform u9 ű
+    - xform u6 ǔ
+    - xform m7 m̄
+    - xform m2 ḿ
+    - xform m8 m̍
+    - xform m3 m̀
+    - xform m5 m̂
+    - xform m9 m̋
+    - xform m6 m̌
+    - xform n7 n̄
+    - xform n2 ń
+    - xform n8 n̍
+    - xform n3 ǹ
+    - xform n5 n̂
+    - xform n9 n̋
+    - xform n6 ň
+
+  __comment_format_poj:
+    - xform/\bts/ch/
+
+    # uá óa
+    - xform/uá/óa/
+    - xform/uà/òa/
+    - xform/uâ/ôa/
+    - xform/uā/ōa/
+    - xform/uǎ/ǒa/
+    - xform/ua̋/őa/
+    - xform/ua/oa/
+    
+    # ué óe
+    - xform/ué/óe/
+    - xform/uè/òe/
+    - xform/uê/ôe/
+    - xform/uē/ōe/
+    - xform/uě/ôe/
+    - xform/ue̋/őe/
+    - xform/ue/oe/
+    
+    # i̍k e̍k
+    - xform/i̍k/e̍k/
+    - xform/ik/ek/
+    
+    # íng éng
+    - xform/íng/éng/
+    - xform/ìng/èng/
+    - xform/îng/êng/
+    - xform/īng/ēng/
+    - xform/ǐng/ěng/
+    - xform/i̋ng/e̋ng/
+    - xform/ing/eng/
+    
+    # óo ó͘
+    - xform/óo/ó͘/
+    - xform/òo/ò͘/
+    - xform/ôo/ô͘/
+    - xform/ōo/ō͘/
+    - xform/ǒo/ǒ͘/
+    - xform/őo/ő͘/
+    - xform/oo/o͘/
+    
+    - xform/nn(h)?\b/ⁿ$1/
+  preedit_format:
+    - xform/\bx/tsh/
+    - xform/\bz/ts/
+    - xform/\bq/kh/
+    - xform/\bd/th/
+    - xform/\bf/ph/
+    - xform/y/oo/
+    - xform/w/ng/
+    - xform/v(h)?(\d)?\b/nn$1$2/
+
+
+custom_phrase:
+  dictionary: ""
+  user_dict: hanlo.custom_phrase
+  db_class: tabledb
+  enable_completion: false
+  enable_sentence: false
+  initial_quality: 99 
+
+
+melt_eng:
+  dictionary: melt_eng
+  enable_sentence: false
+  enable_user_dict: false
+  initial_quality: 1.1
+  comment_format:
+    - xform/.*//
+
+key_binder:
+  bindings:
+    - {accept: "Control+l", toggle: lomaji, when: always}
+
+navigator:
+  bindings:
+    "Alt+Left": left_by_syllable
+    "Alt+Right": right_by_syllable
+    Left: left_by_char
+
+editor:
+  bindings:
+    "Shift+Delete": delete_candidate
+    "Alt+Delete": back_syllable
+    
+    "Shift+Return": commit_comment
+    Return: confirm
+

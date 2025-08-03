@@ -1,0 +1,315 @@
+# Rime schema
+# encoding: utf-8
+#
+#
+
+# modify from: https://github.com/YuRen-tw/rime-taigi-tps
+---
+schema:  # 輸入法方案
+  schema_id: taigi_bophomo  # 輸入法ID
+  name: 台語ㆠㄆㄇ  # 輸入法名稱
+  version: "1.2.0"  # 版本號碼
+  description: 台語ㆠㄆㄇ輸入法
+  author:
+    - splitline
+
+
+switches:
+  - name: ascii_mode
+    reset: 0
+    states: [ 台文, ABC ]
+  - name: emoji
+    states: [ 😴, 😄 ]
+    reset: 1
+  - name: full_shape
+    reset: 0
+    states: [ 半形, 全形 ]
+
+engine:
+  processors:
+    - ascii_composer
+    - recognizer
+    - key_binder
+    - speller
+    - punctuator
+    - selector
+    - navigator
+    - express_editor
+  segmentors:
+    - ascii_segmentor
+    - matcher
+    - abc_segmentor
+    - punct_segmentor
+    - fallback_segmentor
+  translators:
+    - table_translator@custom_phrase
+    - punct_translator
+    - script_translator
+    
+  filters:
+    - lua_filter@*reorder
+    - simplifier@emoji
+    - lua_filter@*emoji
+    - lua_filter@*tsu_im
+    - uniquifier
+
+emoji:
+  option_name: emoji
+  opencc_config: emoji.json
+  inherit_comment: false
+
+menu:
+  alternative_select_keys: "QWERASDZXC"
+  page_size: 10
+
+punctuator:
+  # ㄅㄆㄇㆠㄉㄊㄋㄌㄍㄎㄏㄐㄑㄒㆣㄫㆡㄗㄘㄙㄧㄨㆬㄚㆦㄜㆰㄞㆤㄠㆲㄢㄣㄤㄥㆭˋ˪ˊ˫．
+  full_shape: &symbols
+    '1': ['ㄅ','ㆴ']
+    'q': 'ㄆ'
+    'a': 'ㄇ'
+    'z': 'ㆠ'
+    '2': ['ㄉ', 'ㆵ']
+    'w': 'ㄊ'
+    's': 'ㄋ'
+    'x': 'ㄌ'
+    '3': '˪'
+    'e': ['ㄍ', 'ㆻ']
+    'd': 'ㄎ'
+    'c': ['ㄏ', 'ㆷ']
+    '4': 'ˋ'
+    'r': 'ㄐ'
+    'f': 'ㄑ'
+    'v': 'ㄒ'
+    '5': '˫'
+    't': 'ㆣ'
+    'g': 'ㄫ'
+    'b': ['ㆡ', 'ㆢ']
+    '6': 'ˊ'
+    'y': 'ㄗ'
+    'h': 'ㄘ'
+    'n': 'ㄙ'
+    '7': '．'
+    'u': ['ㄧ','ㆪ']
+    'j': ['ㄨ','ㆫ','ㆨ']
+    'm': 'ㆬ'
+    '8': ['ㄚ','ㆩ']
+    'i': ['ㆦ', 'ㆧ']
+    'k': 'ㄜ'
+    ',': ['ㆰ', 'ㆱ']
+    '9': ['ㄞ', 'ㆮ']
+    'o': ['ㆤ', 'ㆥ', 'ㄝ']
+    'l': ['ㄠ', 'ㆯ']
+    '.': 'ㆲ'
+    '0': 'ㄢ'
+    'p': 'ㄣ'
+    ';': 'ㄤ'
+    '/': 'ㄥ'
+    '-': 'ㆭ'
+  half_shape: *symbols
+
+speller:
+  alphabet: '1qaz2wsxedcrfvtgbyhnujm8ik,9ol.0p;/- 43657'
+  initials: '1qaz2wsxedcrfvtgbyhnujm8ik,9ol.0p;/-7'
+  finals: ' 43567'
+  delimiter: "'"
+  use_space: true
+  algebra:
+    # ===== TL -> TPS =====
+    - xform/h?[48]/0/  # 入聲調（第四調、第八調）合併
+    - xform/9/5/  # 第九調合併到第五調
+    - xform/6/2/  # 第六調合併到第二調
+
+    # 轉換聲母 (initial parts)
+    - xform/^ts/c/ # ts -> ㄗㄐ / ㄑㄘ
+    - xform/^([ptkc])h/\u$1/ # ㄆㄊㄎ(ㄑㄘ)
+    - xform/^ng(\D+)/q$1/ # ㄫ
+    - xform/^j/z/ # ㆡ
+
+    # ㆢㄐㄑㄒ / ㆡㄗㄘㄙ
+    - xform/^ci/ji/  # ㄐㄧ
+    - xform/^Ci/Ji/  # ㄑㄧ
+    - xform/^si/Si/  # ㄒㄧ
+
+    # 轉換韻母 (final parts)
+    - xform/nnh?(\d)/N$1/ # 鼻音
+
+    - xform/o(k|p|m|ng|Nh?)/oo$1/ # it's actually `oo`
+    - xform/(?<!o)o(?!o)/ø/ # ㄜ
+    - xform/oo/o/ # real ㄛ
+
+    - xform/[mp](\d)/B$1/
+    - xform/(i?[aoi])(k|ng)/$1G/
+    - xform/ng/R/ # ㆭ
+    - xform/([ieu]?[iuar])[nt]/$1D/
+
+    # 特殊腔口
+    - xform/ir/y/
+    - xform/er/Ø/
+    - xform/ee/E/
+    
+    - derive/y/u/  # ㆨ=ㄨ
+    - derive/Ø/ø/  # ㄜ
+    - derive/E/e/  # ㄝ=ㆤ
+    
+
+    # ===== features =====
+
+    - derive/iaD/ieD/  # ㄧㄢ、ㄧㄚㆵ → ㄧㄢ、ㄧㆤㆵ
+    - derive/ieD/eD/   # ㄧㄢ、ㄧㆤㆵ → ㆤㄣ、ㆤㆵ
+
+    # 注音
+    - derive/øG/G/  # 用 ㄧㆭ 來拍 ㄧㄥ（併入）
+    - derive/(?<!i)oG/uG/  # 用 ㄨㆭ（注音的 ㄨㄥ）來拍 ㆲ
+    - derive/ioG/BG/       # 用 ㆬㆭ（注音的 ㄩㄥ）來拍 ㄧㆲ
+    # 入聲調
+    - derive/([iao])B0/$1p0/   # 用 ㄚㄅ． 來拍 ㄚㆴ
+    - derive/([iuae])D0/$1t0/  # 用 ㄚㄉ． 來拍 ㄚㆵ
+    - derive/([iaoø])G0/$1k0/  # 用 ㄚㄍ． 來拍 ㄚㆻ
+    # 方音韻母
+    - derive/oB/aB/  # ㆦㆬ、ㆰ（併入）
+    - derive/aB/M/   # ㄚㆬ、ㆰ
+    - xform/aD/L/    # ㄢ
+    - xform/aG/Q/    # ㄤ
+    - xform/ai/I/    # ㄞ
+    - xform/au/U/    # ㄠ
+    - derive/oG/Y/   # ㆦㆭ、ㆲ
+    - derive/R/G/    # ㆭ = ㄥ
+
+    - derive/([iuaoeIU])N/$1$1/     # 拍兩擺韻母來拍鼻音
+    # 簡拼
+    # - abbrev/[iu]?[iuaoeIU]N/N/  # 用 ｎ 代表所有的鼻音母音
+    # - abbrev/[iuaoøeIUMLQYBDG]+0/0/  # 用 ． 代表所有的入聲韻母
+    - abbrev/^([pPbmtTlnkKgqcCzsjJSh]).+$/$1/  # 會當干焦拍聲母
+    - abbrev/^(\D+)([123579])$/$1/  # 除了第四調、第八調，調號會當免拍
+    - abbrev/^([pPbmtTlnkKgqcCzsjJSh]).+(\d)$/$1$2/  # 會當干焦拍子音+調號
+    - xlit|pPmbtTnlkKhjJSgqzcCsiuBaoøMIeUYLDQGR123570|1qaz2wsxedcrfvtgbyhnujm8ik,9ol.0p;/- 43657|
+
+translator:
+  dictionary: hanlo
+  prism: taigi_bophomo
+  spelling_hints: 5
+  always_show_comments: true
+  comment_format:
+    - xform/'/ /
+    - xform/\bts/c/
+    - xform/\b([ptkc])h/\u$1/
+    - xform/a([iu])/\u$1/
+    - xform/\bng(\D+)/q$1/ # ㄫ
+    - xform/\bj/z/ # ㆡ
+
+    - xform/nnh?(\d)/N$1/ # 鼻音
+    
+    - xform/o(k|p|m|ng|Nh?)/oo$1/ # it's actually `oo`
+    - xform/(?<!o)o(?!o)/ø/ # ㄜ
+    - xform/oo/o/ # real ㄛ
+
+    - xform/h(\d)/$1/
+
+    - xform/[mp](\d)/B$1/
+    - xform/(i?[aoi])(k|ng)/$1G/
+    - xform/ng/R/ # ㆭ
+    - xform/([ieu]?[iuar])[nt]/$1D/
+
+    - xform/ir/y/
+    - xform/er/Ø/
+    - xform/ee/E/
+
+
+    - xlit|pPmbtTnlkKhgqcCzsiuaoøeIUBDRGNyØE|ㄅㄆㄇㆠㄉㄊㄋㄌㄍㄎㄏㆣㄫㄗㄘㆡㄙㄧㄨㄚㆦㄜㆤㄞㄠㆬㄣㆭㄥｎㆨㄜㄝ|
+    # 方音符號會分 ㆢㄐㄑㄒ 和 ㆡㄗㄘㄙ
+    - xform/ㄗ(ㄧ)/ㄐ$1/
+    - xform/ㄘ(ㄧ)/ㄑ$1/
+    - xform/ㆡ(ㄧ)/ㆢ$1/
+    - xform/ㄙ(ㄧ)/ㄒ$1/
+    # 入聲調
+    - xform/(?<=ㄧ|ㄚ|ㆦ)ㆬ([48])/ㆴ$1/
+    - xform/(?<=ㄧ|ㆨ|ㄨ|ㄚ)ㄣ([48])/ㆵ$1/
+    - xform/(?<=ㄚ|ㆦ|ㄧ)ㄥ([48])/ㆻ$1/
+    - xform/(?<!ㆴ|ㆵ|ㆻ)([48])/ㆷ$1/
+    # 鼻音
+    # - xform/ｎ((ㄧ|ㄨ)?(ㄧ|ㄨ|ㄚ|ㆦ|ㆤ|ㄞ|ㄠ))/$1ｎ/
+    - xform/ㄧｎ/ㆪ/
+    - xform/ㄨｎ/ㆫ/
+    - xform/ㄚｎ/ㆩ/
+    - xform/ㆦｎ/ㆧ/
+    - xform/ㆤｎ/ㆥ/
+    - xform/ㄞｎ/ㆮ/
+    - xform/ㄠｎ/ㆯ/
+    # 韻母
+    - xform/ㄚㆬ/ㆰ/
+    - xform/ㆦㆬ/ㆱ/
+    - xform/ㄚㄣ/ㄢ/
+    - xform/ㄚㄥ/ㄤ/
+    - xform/ㆦㄥ/ㆲ/
+    - xform/ㄜㄥ/ㄥ/
+    # 聲調
+    - xlit|1235769|ˉˋ˪ˊ˫⁶⁹|
+    - xform/4//
+    - xform/8/˙/
+  preedit_format:
+    - xform/ /ˉ/
+    - xform/'/ /
+    - xlit|1qaz2wsxedcrfvtgbyhnujm8ik,9ol.0p;/-43657|ㄅㄆㄇㆠㄉㄊㄋㄌㄍㄎㄏㄐㄑㄒㆣㄫㆡㄗㄘㄙㄧㄨㆬㄚㆦㄜㆰㄞㆤㄠㆲㄢㄣㄤㄥㆭˋ˪ˊ˫．|
+    # 拆韻母
+    - xform/ㆰ/ㄚㆬ/
+    - xform/ㄢ/ㄚㄣ/
+    - xform/ㄤ/ㄚㄥ/
+    - xform/ㆲ/ㆦㄥ/
+    - xform/ㄨㄥ/ㆦㄥ/
+    - xform/ㆬㄥ/ㄧㆦㄥ/
+    # - xform/ㄧㄥ/ㄧㄜㄥ/
+    # 咱共 ㆢ 和 ㆡ 合併
+    - xform/ㆡㄧ/ㆢㄧ/
+    # 鼻音
+    - xform/ㄧ(ㄧ|ｎ)/ㆪ/
+    - xform/ㄨ(ㄨ|ｎ)/ㆫ/
+    - xform/ㄚ(ㄚ|ｎ)/ㆩ/
+    - xform/ㆦ(ㆦ|ｎ)/ㆧ/
+    - xform/ㆤ(ㆤ|ｎ)/ㆥ/
+    - xform/ㄞ(ㄞ|ｎ)/ㆮ/
+    - xform/ㄠ(ㄠ|ｎ)/ㆯ/
+    # 入聲調
+    - xform/(ㄧ|ㄚ|ㆦ)(ㄅ|ㆬ)．/$1ㆴ/
+    - xform/(ㄧ|ㄨ|ㄚ|ㆤ)(ㄉ|ㄣ)．/$1ㆵ/
+    - xform/(ㄚ|ㆦ|ㄧ)(ㄍ|ㄥ)．/$1ㆻ/
+    - xform/(ㄧ|ㆪ|ㄨ|ㆫ|ㄚ|ㆩ|ㆦ|ㆧ|ㄜ|ㆤ|ㆥ|ㄞ|ㆮ|ㄠ|ㆯ|ㆬ|ㄥ)．/$1ㆷ/
+    # 合韻母
+    - xform/ㄚㆬ/ㆰ/
+    - xform/ㆦㆬ/ㆱ/
+    - xform/ㄚㄣ/ㄢ/
+    - xform/ㄚㄥ/ㄤ/
+    - xform/ㆦㄥ/ㆲ/
+    - xform/ㄜㄥ/ㄥ/
+
+custom_phrase:
+  dictionary: ''
+  user_dict: custom_phrase
+  db_class: stabledb
+  enable_completion: false
+  enable_sentence: false
+  initial_quality: 1
+
+
+key_binder:
+  # import_preset: default
+  bindings:
+    - { when: has_menu, accept: comma, send: comma }      # ㆤ
+    - { when: has_menu, accept: period, send: period }    # ㆲ
+    - { when: has_menu, accept: minus, send: minus }      # ㆭ
+
+
+editor:
+  bindings:
+    "Shift+Delete": delete_candidate
+    "Alt+Delete": back_syllable
+    
+    "Shift+Return": commit_comment
+    Return: confirm
+
+recognizer:
+  patterns:
+    email: ^[a-z][-_.0-9a-z]*@.*$
+    uppercase: ^[A-Z][-_+.'0-9A-Za-z]*$
+    url: ^(www[.]|https?:|ftp:|mailto:).*$
+    punct: '`[^\s]$'
