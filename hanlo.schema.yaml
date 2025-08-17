@@ -258,7 +258,8 @@ translator:
     - xform/\bY/Oo/
     - xform/Y/OO/
     - xform/w/ng/
-    - xform/\bW/Ng/
+    - xform/\bW([A-Z])/NG$1/
+    - xform/\bW([a-z])?/Ng$1/
     - xform/W/NG/
     - xform/v(h)?(\d)?\b/nn$1$2/
     - xform/V(H|h)?(\d)?\b/NN$1$2/
