@@ -19,7 +19,9 @@ function F.func( input, env )
   local text = ctx.input:sub(_start+1)
 
   local lomaji_text = F.format:apply(text, true)
-  if is_lomaji and lomaji_text and #lomaji_text > 0 then
+  if is_lomaji and 
+      text:find("%d") and
+      lomaji_text and #lomaji_text > 0 then
     local lomaji_cand = Candidate("Lomaji", _start, _end, lomaji_text, "")
     lomaji_cand.preedit = F.preedit:apply(text, true)
     yield(lomaji_cand)
