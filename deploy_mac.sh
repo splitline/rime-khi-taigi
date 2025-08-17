@@ -1,6 +1,6 @@
 #!/bin/bash
 
 rm -rf build
-cp -r . ~/Library/Rime/
+cp -r * ~/Library/Rime/
 cd ~/Library/Rime/
-/Library/Input\ Methods/Squirrel.app/Contents/MacOS/rime_deployer --build
+/Library/Input\ Methods/Squirrel.app/Contents/MacOS/Squirrel --reload

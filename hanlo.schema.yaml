@@ -20,8 +20,6 @@ schema:  # 輸入法方案
 
 
 switches:
-  - name: ascii_mode
-    reset: 0
   - name: emoji
     states: [ 😴, 😄 ]
     reset: 1
@@ -34,7 +32,6 @@ switches:
 
 engine:
   processors:
-    - ascii_composer
     - recognizer
     - key_binder
     - speller
@@ -44,7 +41,6 @@ engine:
     - express_editor
 
   segmentors:
-    - ascii_segmentor
     - matcher
     - abc_segmentor
     - punct_segmentor
@@ -57,46 +53,36 @@ engine:
     - script_translator
 
   filters:
+    - lua_filter@*pre_lomaji
     - lua_filter@*poj
     - lua_filter@*reorder
     - simplifier@emoji
     - lua_filter@*emoji
     - uniquifier
     - lua_filter@*lomaji
-
-
-long_word_filter:
-  count: 3
-  idx: 5
-
+    - lua_filter@*autocap_filter
 
 emoji:
   option_name: emoji
   opencc_config: emoji.json
   inherit_comment: false
 
-
-ascii_composer:
-  switch_key:
-    Shift_L: commit_text
-    Shift_R: noop
-    Caps_Lock: commit_text
-    Control_L: noop
-    Control_R: noop
+punctuator:  # 設定標點符號表
+  import_preset: hanlo.symbol
 
 menu:
-  alternative_select_keys: "QWERASDZXC"
   page_size: 10
 
 
 speller:
-  alphabet: 'abcdefghijklmnopqrstuvwxyz1234567890 '
-  initials: 'abcdefghijklmnopqrstuvwxyz'
+  alphabet: 'abcdefghijklmnopqrstuvwxyzZYXWVUTSRQPONMLKJIHGFEDCBA1234567890 '
+  initials: 'abcdefghijklmnopqrstuvwxyzZYXWVUTSRQPONMLKJIHGFEDCBA'
   # finals: "123456789qwzx "
   use_space: true
   auto_select: false
-  delimiter: " "
+  delimiter: " -"
   algebra:
+
     # 會當用 POJ 來拍
     - derive/^ts/ch/
     - derive/ua/oa/
@@ -130,6 +116,9 @@ speller:
     - abbrev/^(ts)(?!h).+/$1/
     - abbrev/^(tsh).+/$1/
 
+    - derive/^([a-z]+)/\U$1/ # FULLCAP
+    - derive/^([a-z])/\U$1/ # Firstcap
+
 
 translator:
   dictionary: hanlo
@@ -138,7 +127,18 @@ translator:
   initial_quality: 1.2
   always_show_comments: true
   comment_format:
-    - xform/ /-/
+    # Capitalization is controlled by Lua.
+    - xlit ABCDEFGHIJKLMNOPQRSTUVWXYZ abcdefghijklmnopqrstuvwxyz
+
+    - xform/\bx/tsh/
+    - xform/\bz/ts/
+    - xform/\bq/kh/
+    - xform/\bd/th/
+    - xform/\bf/ph/
+    - xform/y/oo/
+    - xform/w/ng/
+    - xform/v(h)?(\d)?\b/nn$1$2/
+
     - xform ([aeiou])(r?)(n[ng]?|m)?([ptkh])?(\d) $1$5$2$3$4
     - xform ([mn])(g)?(h)?(\d) $1$4$2$3
     - xform ([ao])([iuo])(\d) $1$3$2
@@ -197,21 +197,21 @@ translator:
     - xform/\bts/ch/
 
     # uá óa
-    - xform/uá/óa/
-    - xform/uà/òa/
-    - xform/uâ/ôa/
-    - xform/uā/ōa/
-    - xform/uǎ/ǒa/
-    - xform/ua̋/őa/
-    - xform/ua/oa/
+    - xform/[ou]á/óa/
+    - xform/[ou]à/òa/
+    - xform/[ou]â/ôa/
+    - xform/[ou]ā/ōa/
+    - xform/[ou]ǎ/ǒa/
+    - xform/[ou]a̋/őa/
+    - xform/[ou]a/oa/
     
     # ué óe
-    - xform/ué/óe/
-    - xform/uè/òe/
-    - xform/uê/ôe/
-    - xform/uē/ōe/
-    - xform/uě/ôe/
-    - xform/ue̋/őe/
+    - xform/[ou]é/óe/
+    - xform/[ou]è/òe/
+    - xform/[ou]ê/ôe/
+    - xform/[ou]ē/ōe/
+    - xform/[ou]ě/ôe/
+    - xform/[ou]e̋/őe/
     - xform/ue/oe/
     
     # i̍k e̍k
@@ -239,13 +239,29 @@ translator:
     - xform/nn(h)?\b/ⁿ$1/
   preedit_format:
     - xform/\bx/tsh/
+    - xform/\bX([A-Z])/TSH$1/
+    - xform/\bX([a-z])?/Tsh$1/
     - xform/\bz/ts/
+    - xform/\bZ([A-Z])/TS$1/
+    - xform/\bZ([a-z])?/Ts$1/
     - xform/\bq/kh/
+    - xform/\bQ([A-Z])/KH$1/
+    - xform/\bQ([a-z])?/Kh$1/
     - xform/\bd/th/
+    - xform/\bD([A-Z])/TH$1/
+    - xform/\bD([a-z])?/Th$1/
     - xform/\bf/ph/
+    - xform/\bF([A-Z])/PH$1/
+    - xform/\bF([a-z])?/Ph$1/
+
     - xform/y/oo/
+    - xform/\bY/Oo/
+    - xform/Y/OO/
     - xform/w/ng/
+    - xform/\bW/Ng/
+    - xform/W/NG/
     - xform/v(h)?(\d)?\b/nn$1$2/
+    - xform/V(H|h)?(\d)?\b/NN$1$2/
 
 
 custom_phrase:
@@ -267,6 +283,7 @@ melt_eng:
 
 key_binder:
   bindings:
+    - {accept: "Shift+space", toggle: lomaji, when: always}
     - {accept: "Control+l", toggle: lomaji, when: always}
 
 navigator:

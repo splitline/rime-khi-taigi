@@ -196,29 +196,31 @@ class TextProcessor:
     @staticmethod
     def _detect_tone(syllable_lower: str, is_neutral: bool = False) -> str:
         """Detect tone number from syllable with diacritical marks."""
-        if is_neutral:
-            return "4"
         
         tone_markers = {
-            "5": ('âêîôû', b'\xcc\x82'.decode()),
-            "2": ('áéíóúḿń', b'\xcc\x81'.decode()),
-            "3": ('àèìòùǹ', b'\xcc\x80'.decode()),
-            "7": ('āēīōū', b'\xcc\x84'.decode()),
-            "6": ('ăĕĭŏŭ', b'\xcc\x86'.decode()),
-            "9": ('űő', b'\xcc\x8b'.decode())
+            "5": ('âêîôû', '\u0302'),
+            "2": ('áéíóúḿń', '\u0301'),
+            "3": ('àèìòùǹ', '\u0300'),
+            "7": ('āēīōū', '\u0304'),
+            "6": ('ǎěǐǒǔň', '\u0306'),
+            "9": ('űő', '\u030B')
         }
+
+        tone = "1"
         
         # Check stop consonants first
         if syllable_lower.endswith(('p', 't', 'k', 'h')):
-            return "8" if b'\xcc\x8d'.decode() in syllable_lower else "4"
+            tone = "8" if '\u030D' in syllable_lower else "4"
         
         # Check tone markers
-        for tone, (chars, combining) in tone_markers.items():
+        for t, (chars, combining) in tone_markers.items():
             if any(c in syllable_lower for c in chars) or combining in syllable_lower:
-                return tone
+                tone = t
+                break
         
-        return "1"  # Default tone
-    
+        return tone
+        # return (tone + "+") if is_neutral else tone
+
     @staticmethod
     def _process_hyphenated_syllable(syllable: str) -> List[str]:
         """Process hyphenated syllable and return list of syllables with tones."""
@@ -539,9 +541,29 @@ class DictionaryProcessor:
             hanzi = self._clean_entry(str(entry[2]))
             roman_str = self._clean_entry(str(entry[3])) if len(entry) > 3 else ""
             
-            if not hanzi or any(s in hanzi for s in self.config.invalid_symbols):
+            if not hanzi:
                 continue
-            
+
+            if any(s in hanzi for s in self.config.invalid_symbols):
+                # Create a regex pattern to split by any of the invalid symbols
+                # Escape special regex characters in the symbols
+                pattern = '[' + re.escape("".join(self.config.invalid_symbols)) + ']'
+                
+                hanzi_segments = [seg.strip() for seg in re.split(pattern, hanzi) if seg.strip()]
+                roman_segments = [seg.strip() for seg in re.split(pattern, roman_str) if seg.strip()]
+
+                if len(hanzi_segments) == len(roman_segments):
+                    for h_seg, r_seg in zip(hanzi_segments, roman_segments):
+                        if h_seg and r_seg:
+                            # Process each segment as a separate entry
+                            entries = self._process_entry_pronunciations(h_seg, r_seg, self.config.word_weight, entry_id)
+                            word_dict_entries.extend(entries)
+                
+                # replace pattern to ""
+                roman_str = re.sub(pattern, '', roman_str).strip()
+                hanzi = re.sub(pattern, '', hanzi).strip()
+                if len(hanzi) > 7: continue  # Skip overly long entries
+
             if roman_str:
                 entries = self._process_entry_pronunciations(hanzi, roman_str, self.config.word_weight, entry_id)
                 word_dict_entries.extend(entries)
@@ -564,6 +586,14 @@ class DictionaryProcessor:
         for entry in char_entries:
             if len(entry) < 2:
                 continue
+
+            # possible contains wrong mapping from geo name / station name
+            # e.g.
+            # - 醫 / pēnn：這是一个較譀兮例，這是予一寡號做「XX醫院」毋過念做「XX病院」兮車站站名牽去兮
+            # https://sutian.moe.edu.tw/zh-hant/tshiau/?lui=tai_su&tsha=醫院
+            # - 軌 / thih：嘛是一个誠譀兮例，這是予輕軌機廠 / Khin-thih Ki-tshiúnn 牽去
+            # https://sutian.moe.edu.tw/zh-hant/su/28046/
+            if entry[2] == "詞目": continue 
                 
             hanzi = str(entry[0]).lstrip('-')
             roman_str = str(entry[1]).lstrip('-')

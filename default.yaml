@@ -4,9 +4,8 @@ config_version: '2025-02-24'
 # 方案列表
 schema_list:
   - schema: hanlo
-  # - schema: pojhan
   - schema: taigi_bophomo
-  # - schema: lui_im_po_kam
+  - schema: lui_im_po_kam
  
 
 switcher:
